@@ -27,7 +27,7 @@ When recalls were found, the agent produced clear, structured summaries that a n
 ## What Did Not Work / Limitations
 
 **Limited database coverage.**
-The recall database only contains 19 vehicle models across 5 years (2020-2024). Queries for vehicles outside this set return no results even if NHTSA has recall data for them. The 2021 Toyota Camry and 2022 Honda Civic queries both returned empty results because those specific combinations had no matching records in the database.
+The recall database only contains 19 vehicle models across 5 years (2020-2024). While the RAG pipeline's semantic search significantly improved recall discovery — finding results for the Toyota Camry, Honda Civic, and Tesla Model 3 that direct SQL queries missed — vehicles completely outside the scraped dataset still return no results. A user with a 2019 Mazda CX-5, for example, would get nothing despite NHTSA having recall data for it.
 
 **No fallback to live NHTSA API.**
 When no records are found in RDS, the agent tells the user there are no recalls rather than falling back to query the live NHTSA API. This could mislead users into thinking their vehicle is recall-free when the database simply does not cover it.
@@ -53,9 +53,17 @@ The database stores year as an integer but the VIN decoder returns it as a strin
 
 4. **Add a confidence disclaimer** — the agent should always tell users to verify on NHTSA.gov regardless of what the database returns, since recalls can be issued at any time.
 
-5. **Implement RAG with Bedrock embeddings** — the current implementation uses direct SQL queries. A proper RAG pipeline with Bedrock embeddings would allow semantic search across recall descriptions, enabling queries like "recalls related to airbag issues" without knowing the exact vehicle.
+5. **Save the FAISS index to disk** — currently the RAG pipeline re-embeds all 272 records every time the agent starts, taking approximately 10 minutes. In production, the index should be saved to S3 after the first build and loaded on startup instead of rebuilding from scratch.
 
 6. **Add error handling for invalid VINs** — the agent should gracefully handle malformed or fake VINs rather than returning a confusing empty result.
+
+7. **Add Comprehensive Unit Tests** — complete more than 5 tests that cover invalid VINs, empty results, API failures, and timeouts because a production system would need significantly more coverage before running unsupervised every 24 hours.
+
+    **Missing Tests Include:**
+    - Integration tests that hit the real database and API against a test environment
+    - Edge case tests for empty VINs, malformed API responses, missing fields, and duplicate records
+    - Performance tests to verify the pipeline completes within the Lambda timeout (configured timeout)
+    - Data quality tests to validate all required fields are present and dates are correctly formatted
 
 ---
 
@@ -64,11 +72,8 @@ The database stores year as an integer but the VIN decoder returns it as a strin
 | Query | Tools Called | Recalls Found | Notes |
 |---|---|---|---|
 | 2020 Ford F-150 | search_recalls | 5 | All accurate, well formatted |
-| VIN 1FTFW1ET5DFC10312 | decode_vin + search_recalls | 0 | 2013 F-150 not in DB range |
-| 2021 Toyota Camry | search_recalls | 0 | In DB but no recalls scraped |
-| 2022 Honda Civic | search_recalls | 0 | In DB but no recalls scraped |
-| 2023 Tesla Model 3 | search_recalls | 1 | Found airbag recall accurately |
+| VIN 1FTFW1ET5DFC10312 | decode_vin + search_recalls | 0 | 2013 F-150 not in DB date range |
+| 2021 Toyota Camry | search_recalls | 1 | Airbag recall found via semantic search |
+| 2022 Honda Civic | search_recalls | 2 | Two steering recalls found |
+| 2023 Tesla Model 3 | search_recalls | 2 | Battery and Autosteer recalls found |
 
----
-
-*Reflection prepared by Saveena Boga | June 2026*
