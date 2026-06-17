@@ -30,5 +30,5 @@ jobs:
           ECR_REPOSITORY: recall-agent
           IMAGE_TAG: latest
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ./task6-agent
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ./task7-agent-service
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
