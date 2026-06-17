@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import pickle
 import boto3
 import numpy as np
 import faiss
@@ -8,6 +9,8 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 
 bedrock = boto3.client("bedrock-runtime", region_name="us-east-1")
+INDEX_FILE = "recalls.index"
+CHUNKS_FILE = "recalls_chunks.pkl"
 
 def get_embedding(text, retries=5):
     for attempt in range(retries):
@@ -35,7 +38,7 @@ def get_db_connection():
         sslmode="require"
     )
 
-def load_and_index_recalls():
+def build_and_save_index():
     conn = get_db_connection()
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute("SELECT recall_id, make, model, year, component, description, consequence, remedy FROM recalls")
@@ -59,7 +62,21 @@ def load_and_index_recalls():
     vectors = np.array(embeddings, dtype="float32")
     index.add(vectors)
     print("FAISS index built with " + str(index.ntotal) + " vectors")
+    faiss.write_index(index, INDEX_FILE)
+    with open(CHUNKS_FILE, "wb") as f:
+        pickle.dump(chunks, f)
+    print("Index and chunks saved to disk")
     return index, chunks
+
+def load_and_index_recalls(force_rebuild=False):
+    if not force_rebuild and os.path.exists(INDEX_FILE) and os.path.exists(CHUNKS_FILE):
+        print("Loading cached FAISS index from disk...")
+        index = faiss.read_index(INDEX_FILE)
+        with open(CHUNKS_FILE, "rb") as f:
+            chunks = pickle.load(f)
+        print("Loaded cached index with " + str(index.ntotal) + " vectors")
+        return index, chunks
+    return build_and_save_index()
 
 def semantic_search(index, chunks, query, top_k=5):
     query_emb = np.array([get_embedding(query)], dtype="float32")

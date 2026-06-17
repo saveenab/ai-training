@@ -1,0 +1,9 @@
+venv/
+__pycache__/
+*.pyc
+.git/
+.gitignore
+test_queries.py
+test_results.json
+reflection.md
+.env
