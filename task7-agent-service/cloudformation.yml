@@ -170,6 +170,7 @@ Resources:
                   - arn:aws:secretsmanager:us-east-1:676945141118:secret:recall-agent/anthropic-api-key-9JtL9s
                   - arn:aws:secretsmanager:us-east-1:676945141118:secret:recall-agent/aws-access-key-id-joCJhv
                   - arn:aws:secretsmanager:us-east-1:676945141118:secret:recall-agent/aws-secret-access-key-NG71fK
+                  - arn:aws:secretsmanager:us-east-1:676945141118:secret:recall-agent/db-password-x23d49
 
   # ─── ALB ────────────────────────────────────────────────────────────────────
 
@@ -236,6 +237,8 @@ Resources:
               ValueFrom: arn:aws:secretsmanager:us-east-1:676945141118:secret:recall-agent/aws-access-key-id-joCJhv
             - Name: AWS_SECRET_ACCESS_KEY
               ValueFrom: arn:aws:secretsmanager:us-east-1:676945141118:secret:recall-agent/aws-secret-access-key-NG71fK
+            - Name: DB_PASS
+              ValueFrom: arn:aws:secretsmanager:us-east-1:676945141118:secret:recall-agent/db-password-x23d49
           Environment:
             - Name: DB_HOST
               Value: automotive.c2tcos6qgb7w.us-east-1.rds.amazonaws.com
@@ -243,8 +246,6 @@ Resources:
               Value: postgres
             - Name: DB_USER
               Value: postgres
-            - Name: DB_PASS
-              Value: admin1234
             - Name: AWS_DEFAULT_REGION
               Value: us-east-1
           LogConfiguration:
