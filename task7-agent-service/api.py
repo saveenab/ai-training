@@ -1,11 +1,45 @@
 import os
 import json
 import time
+import logging
 import anthropic
+import boto3
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from tools import decode_vin, search_recalls
 from rag import load_and_index_recalls, semantic_search
+
+# Structured JSON logger
+class JSONFormatter(logging.Formatter):
+    def format(self, record):
+        log_data = {
+            "timestamp": self.formatTime(record),
+            "level": record.levelname,
+            "message": record.getMessage()
+        }
+        if hasattr(record, "extra"):
+            log_data.update(record.extra)
+        return json.dumps(log_data)
+
+handler = logging.StreamHandler()
+handler.setFormatter(JSONFormatter())
+logger = logging.getLogger("recall-agent")
+logger.setLevel(logging.INFO)
+logger.addHandler(handler)
+
+# CloudWatch client
+cloudwatch = boto3.client("cloudwatch", region_name="us-east-1")
+
+def publish_metrics(latency_ms: int, is_error: bool):
+    cloudwatch.put_metric_data(
+        Namespace="RecallAgent",
+        MetricData=[
+            {"MetricName": "RequestCount", "Value": 1, "Unit": "Count"},
+            {"MetricName": "Latency", "Value": latency_ms, "Unit": "Milliseconds"},
+            {"MetricName": "ErrorCount", "Value": 1 if is_error else 0, "Unit": "Count"}
+        ]
+    )
 
 app = FastAPI(title="VIN Recall Agent API")
 
@@ -80,10 +114,11 @@ def run_agent(user_query):
             messages.append({"role": "user", "content": tool_results})
 
         elif response.stop_reason == "end_turn":
-            return next((b.text for b in response.content if hasattr(b, "text")), "")
+            text = next((b.text for b in response.content if hasattr(b, "text")), "")
+            return text, response.usage.input_tokens, response.usage.output_tokens
 
         else:
-            return "Agent could not complete the request."
+            return "Agent could not complete the request.", 0, 0
 
 @app.get("/health")
 def health_check():
@@ -92,8 +127,36 @@ def health_check():
 @app.post("/query", response_model=QueryResponse)
 def query_agent(request: QueryRequest):
     start = time.time()
-    answer = run_agent(request.query)
+    error_message = None
+
+    try:
+        answer, input_tokens, output_tokens = run_agent(request.query)
+        is_error = False
+    except Exception as e:
+        answer = "An error occurred processing your request."
+        error_message = str(e)
+        input_tokens, output_tokens = 0, 0
+        is_error = True
+
     latency_ms = int((time.time() - start) * 1000)
+
+    logger.info("request", extra={"extra": {
+        "query": request.query,
+        "latency_ms": latency_ms,
+        "model": "claude-sonnet-4-6",
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "error": error_message
+    }})
+
+    try:
+        publish_metrics(latency_ms, is_error)
+    except Exception as e:
+        logger.warning("cloudwatch_publish_failed", extra={"extra": {"reason": str(e)}})
+
+    if is_error:
+        return JSONResponse(status_code=500, content={"error": error_message})
+
     return QueryResponse(
         response=answer,
         latency_ms=latency_ms,
