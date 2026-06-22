@@ -1,6 +1,6 @@
 import anthropic
 
-client = anthropic.Anthropic(api_key="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")
+client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 message = client.messages.create(
     model="claude-sonnet-4-6",
