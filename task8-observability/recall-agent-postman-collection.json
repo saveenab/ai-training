@@ -1,0 +1,528 @@
+{
+  "info": {
+    "_postman_id": "e7c85334-2262-46f4-9f59-57d5254703b8",
+    "name": "Recall Agent - Integration Tests",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "54803221",
+    "_collection_link": "https://go.postman.co/collection/54803221-e7c85334-2262-46f4-9f59-57d5254703b8?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "01 - Valid Make Model Year",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status is 200\", function(){",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test(\"Response has response field\", function(){",
+              "    var json = pm.response.json();",
+              "    pm.expect(json.response).to.be.a('string').and.not.empty;",
+              "});",
+              "pm.test(\"Response has latency_ms\", function(){",
+              "    pm.expect(pm.response.json().latency_ms).to.be.a('number');",
+              "});",
+              "pm.test(\"Model is correct\", function(){",
+              "    pm.expect(pm.response.json().model).to.eql(\"claude-sonnet-4-6\");",
+              "});"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"query\": \"Are there any recalls for a 2020 Ford F-150?\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://recall-agent-alb-1269439320.us-east-1.elb.amazonaws.com/query",
+          "protocol": "http",
+          "host": [
+            "recall-agent-alb-1269439320",
+            "us-east-1",
+            "elb",
+            "amazonaws",
+            "com"
+          ],
+          "path": [
+            "query"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "02 VIN Query",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status is 200\", function(){",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test(\"Response has response field\", function(){",
+              "    var json = pm.response.json();",
+              "    pm.expect(json.response).to.be.a('string').and.not.empty;",
+              "});",
+              "pm.test(\"Response has latency_ms\", function(){",
+              "    pm.expect(pm.response.json().latency_ms).to.be.a('number');",
+              "});",
+              "pm.test(\"Model is correct\", function(){",
+              "    pm.expect(pm.response.json().model).to.eql(\"claude-sonnet-4-6\");",
+              "});"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"query\": \"Check recalls for VIN 1FTFW1ET5DFC10312\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://recall-agent-alb-1269439320.us-east-1.elb.amazonaws.com/query",
+          "protocol": "http",
+          "host": [
+            "recall-agent-alb-1269439320",
+            "us-east-1",
+            "elb",
+            "amazonaws",
+            "com"
+          ],
+          "path": [
+            "query"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "03 - Health Check",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status is 200\", function(){",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test(\"Status is ok\", function(){",
+              "    pm.expect(pm.response.json().status).to.eql(\"ok\");",
+              "});"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "protocolProfileBehavior": {
+        "disableBodyPruning": true
+      },
+      "request": {
+        "method": "GET",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://recall-agent-alb-1269439320.us-east-1.elb.amazonaws.com/health",
+          "protocol": "http",
+          "host": [
+            "recall-agent-alb-1269439320",
+            "us-east-1",
+            "elb",
+            "amazonaws",
+            "com"
+          ],
+          "path": [
+            "health"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "04 - Empty Query",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Returns error status\", function(){",
+              "    pm.expect(pm.response.code).to.be.oneOf([400,422,500]);",
+              "});",
+              ""
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"query\": \"\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://recall-agent-alb-1269439320.us-east-1.elb.amazonaws.com/query",
+          "protocol": "http",
+          "host": [
+            "recall-agent-alb-1269439320",
+            "us-east-1",
+            "elb",
+            "amazonaws",
+            "com"
+          ],
+          "path": [
+            "query"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "05 - Whitespace Query",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Does not crash server\", function(){",
+              "    pm.expect(pm.response.code).to.be.oneOf([200,400,422,500]);",
+              "});",
+              ""
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"query\": \"   \"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://recall-agent-alb-1269439320.us-east-1.elb.amazonaws.com/query",
+          "protocol": "http",
+          "host": [
+            "recall-agent-alb-1269439320",
+            "us-east-1",
+            "elb",
+            "amazonaws",
+            "com"
+          ],
+          "path": [
+            "query"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "06 - Long Input",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Does not crash server\", function() {",
+              "    pm.expect(pm.response.code).to.be.oneOf([200, 500]);",
+              "});",
+              "pm.test(\"Response time under 60s\", function() {",
+              "    pm.expect(pm.response.responseTime).to.be.below(60000);",
+              "});"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"query\": \"What recalls exist for a 2020 Ford F-150? What recalls exist for a 2020 Ford F-150? What recalls exist for a 2020 Ford F-150? What recalls exist for a 2020 Ford F-150? What recalls exist for a 2020 Ford F-150? What recalls exist for a 2020 Ford F-150? What recalls exist for a 2020 Ford F-150? What recalls exist for a 2020 Ford F-150? What recalls exist for a 2020 Ford F-150? What recalls exist for a 2020 Ford F-150?\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://recall-agent-alb-1269439320.us-east-1.elb.amazonaws.com/query",
+          "protocol": "http",
+          "host": [
+            "recall-agent-alb-1269439320",
+            "us-east-1",
+            "elb",
+            "amazonaws",
+            "com"
+          ],
+          "path": [
+            "query"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "07 - Car Not in Dataset",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status is 200\", function(){",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test(\"Response has response field\", function(){",
+              "    var json = pm.response.json();",
+              "    pm.expect(json.response).to.be.a('string').and.not.empty;",
+              "});",
+              "pm.test(\"Response has latency_ms\", function(){",
+              "    pm.expect(pm.response.json().latency_ms).to.be.a('number');",
+              "});",
+              "pm.test(\"Model is correct\", function(){",
+              "    pm.expect(pm.response.json().model).to.eql(\"claude-sonnet-4-6\");",
+              "});"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"query\": \"Are there any recalls for a 2022 Lamborghini Huracan?\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://recall-agent-alb-1269439320.us-east-1.elb.amazonaws.com/query",
+          "protocol": "http",
+          "host": [
+            "recall-agent-alb-1269439320",
+            "us-east-1",
+            "elb",
+            "amazonaws",
+            "com"
+          ],
+          "path": [
+            "query"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "08 - VIN Only",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test(\"Response has a response field\", function(){",
+              "    pm.expect(pm.response.json().response).to.be.a('string').and.not.empty;",
+              "});"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"query\": \"1HGBH41JXMN109186\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://recall-agent-alb-1269439320.us-east-1.elb.amazonaws.com/query",
+          "protocol": "http",
+          "host": [
+            "recall-agent-alb-1269439320",
+            "us-east-1",
+            "elb",
+            "amazonaws",
+            "com"
+          ],
+          "path": [
+            "query"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "09 - Very Old Vehicle",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status is 200\", function(){",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test(\"Response has response field\", function(){",
+              "    var json = pm.response.json();",
+              "    pm.expect(json.response).to.be.a('string').and.not.empty;",
+              "});",
+              "pm.test(\"Response has latency_ms\", function(){",
+              "    pm.expect(pm.response.json().latency_ms).to.be.a('number');",
+              "});",
+              "pm.test(\"Model is correct\", function(){",
+              "    pm.expect(pm.response.json().model).to.eql(\"claude-sonnet-4-6\");",
+              "});"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"query\": \"Are there recalls for a 1985 Ford Mustang\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://recall-agent-alb-1269439320.us-east-1.elb.amazonaws.com/query",
+          "protocol": "http",
+          "host": [
+            "recall-agent-alb-1269439320",
+            "us-east-1",
+            "elb",
+            "amazonaws",
+            "com"
+          ],
+          "path": [
+            "query"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "10 - Non Vehicle Question",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status is 200\", function(){",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test(\"Response has response field\", function(){",
+              "    pm.expect(pm.response.json().response).to.be.a('string').and.not.empty;",
+              "});"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"query\": \"What is the weather today in New York?\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://recall-agent-alb-1269439320.us-east-1.elb.amazonaws.com/query",
+          "protocol": "http",
+          "host": [
+            "recall-agent-alb-1269439320",
+            "us-east-1",
+            "elb",
+            "amazonaws",
+            "com"
+          ],
+          "path": [
+            "query"
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}
