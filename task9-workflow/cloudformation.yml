@@ -1,0 +1,197 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Task 9 - End-to-end workflow with EventBridge and Step Functions
+
+Parameters:
+  SNSTopicArn:
+    Type: String
+    Default: "arn:aws:sns:us-east-1:676945141118:recall-agent-alerts"
+
+Resources:
+
+  # ── Lambda execution role ──────────────────────────────────────────────────
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: recall-agent-lambda-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: S3ReadPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource: arn:aws:s3:::recall-agent-inputs/*
+        - PolicyName: RDSAccessPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: "*"
+
+  # ── Lambda function ────────────────────────────────────────────────────────
+  InvokeAgentLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: recall-agent-invoke
+      Runtime: python3.12
+      Handler: invoke_agent.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 120
+      Code:
+        S3Bucket: recall-agent-inputs
+        S3Key: lambda/invoke_agent.zip
+      Environment:
+        Variables:
+          ALB_ENDPOINT: "http://recall-agent-alb-1269439320.us-east-1.elb.amazonaws.com/query"
+
+  # ── Step Functions execution role ──────────────────────────────────────────
+  StepFunctionsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: recall-agent-stepfunctions-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: states.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: StepFunctionsPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: !GetAtt InvokeAgentLambda.Arn
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource: !Ref SNSTopicArn
+              - Effect: Allow
+                Action:
+                  - rds-data:ExecuteStatement
+                Resource: "*"
+
+  # ── Step Function state machine ────────────────────────────────────────────
+  RecallAgentStateMachine:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      StateMachineName: recall-agent-workflow
+      RoleArn: !GetAtt StepFunctionsRole.Arn
+      DefinitionString: !Sub |
+        {
+          "Comment": "Recall agent end-to-end workflow",
+          "StartAt": "InvokeAgent",
+          "States": {
+            "InvokeAgent": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {
+                "FunctionName": "${InvokeAgentLambda.Arn}",
+                "Payload": {
+                  "bucket.$": "$.bucket",
+                  "key.$": "$.key"
+                }
+              },
+              "ResultPath": "$.agentResult",
+              "Next": "StoreResult",
+              "Catch": [
+                {
+                  "ErrorEquals": ["States.ALL"],
+                  "Next": "Notify",
+                  "ResultPath": "$.error"
+                }
+              ]
+            },
+            "StoreResult": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::sns:publish",
+              "Parameters": {
+                "TopicArn": "${SNSTopicArn}",
+                "Message.$": "States.Format('Query: {}\nResponse: {}', $.agentResult.Payload.query, $.agentResult.Payload.response)",
+                "Subject": "Recall Agent Result Stored"
+              },
+              "ResultPath": "$.storeResult",
+              "Next": "Notify"
+            },
+            "Notify": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::sns:publish",
+              "Parameters": {
+                "TopicArn": "${SNSTopicArn}",
+                "Message.$": "States.Format('Workflow complete. Query: {}', $.agentResult.Payload.query)",
+                "Subject": "Recall Agent Workflow Complete"
+              },
+              "End": true
+            }
+          }
+        }
+
+  # ── EventBridge role ───────────────────────────────────────────────────────
+  EventBridgeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: recall-agent-eventbridge-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: StartStepFunctions
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - states:StartExecution
+                Resource: !GetAtt RecallAgentStateMachine.Arn
+
+  # ── EventBridge rule ───────────────────────────────────────────────────────
+  S3UploadRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: recall-agent-s3-trigger
+      EventPattern:
+        source:
+          - aws.s3
+        detail-type:
+          - Object Created
+        detail:
+          bucket:
+            name:
+              - recall-agent-inputs
+          object:
+            key:
+              - prefix: inputs/
+      Targets:
+        - Id: StepFunctionsTarget
+          Arn: !GetAtt RecallAgentStateMachine.Arn
+          RoleArn: !GetAtt EventBridgeRole.Arn
+          InputTransformer:
+            InputPathsMap:
+              bucket: "$.detail.bucket.name"
+              key: "$.detail.object.key"
+            InputTemplate: '{"bucket": "<bucket>", "key": "<key>"}'
+
+Outputs:
+  StateMachineArn:
+    Value: !GetAtt RecallAgentStateMachine.Arn
+  LambdaArn:
+    Value: !GetAtt InvokeAgentLambda.Arn
